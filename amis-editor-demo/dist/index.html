@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>amis 可视化编辑器 · 本地版</title>
+  <script type="module" crossorigin src="./assets/index-BHeduerc.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CziH1Ysj.css">
+</head>
+<body>
+  <div id="root" style="height:100vh"></div>
+  <script>
+    window.onerror = function (msg, src, line) {
+      var d = document.getElementById('__errbar');
+      if (!d) {
+        d = document.createElement('div');
+        d.id = '__errbar';
+        d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#a32d2d;color:#fff;padding:6px 12px;z-index:99999;font:12px sans-serif;max-height:120px;overflow:auto';
+        document.body.appendChild(d);
+      }
+      d.textContent += '页面出错: ' + msg + ' @' + (src || '') + ':' + line + ' | ';
+    };
+  </script>
+</body>
+</html>

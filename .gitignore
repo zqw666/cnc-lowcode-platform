@@ -1,0 +1,17 @@
+# 依赖（851M，不入库，克隆后 npm install 重建）
+node_modules/
+
+# 工具与编辑器
+.workbuddy/
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+._*

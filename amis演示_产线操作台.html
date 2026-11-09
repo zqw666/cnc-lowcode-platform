@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNC 产线操作台 · amis 低代码演示</title>
+<link rel="stylesheet" href="amis_sdk/sdk.css">
+<link rel="stylesheet" href="amis_sdk/iconfont.css">
+<style>body{margin:0;background:#f2f2f2;}</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="err" style="display:none;padding:40px;font-family:sans-serif;color:#a32d2d">
+  amis SDK 加载失败：请确认 amis_sdk 文件夹与本 HTML 在同一目录。
+</div>
+
+<script src="amis_sdk/sdk.js"></script>
+<script>
+if (typeof amisRequire === 'undefined') {
+  document.getElementById('root').style.display = 'none';
+  document.getElementById('err').style.display = 'block';
+} else {
+
+window.onerror = function(msg, src, line) {
+  document.getElementById('err').style.display = 'block';
+  document.getElementById('err').innerText = '页面出错: ' + msg + ' @' + (src||'') + ':' + line;
+};
+
+const machines = [
+  { id:'M01', brand:'Roders',   ip:'220.168.1.10', statusLabel:'加工中', color:'#3b6d11', program:'O0011', part:'H2165-壳体' },
+  { id:'M02', brand:'Makino',   ip:'220.168.1.11', statusLabel:'空闲',   color:'#854f0b', program:'-',     part:'-' },
+  { id:'M03', brand:'Siemens',  ip:'220.168.1.12', statusLabel:'报警',   color:'#a32d2d', program:'N90_XZ',part:'H2186-电极' },
+  { id:'M04', brand:'Fanuc',    ip:'220.168.1.13', statusLabel:'离线',   color:'#888780', program:'-',     part:'-' }
+];
+
+const empty = '#e8e6de', filled = '#ba7517';
+const rackRows = [
+  { layer:'第1层', c1:'H2165', k1:filled, c2:'空', k2:empty, c3:'H2159', k3:filled, c4:'空', k4:empty, c5:'H2188', k5:filled, c6:'空', k6:empty },
+  { layer:'第2层', c1:'空', k1:empty, c2:'H2186', k2:filled, c3:'空', k3:empty, c4:'H2201', k4:filled, c5:'空', k5:empty, c6:'空', k6:empty },
+  { layer:'第3层', c1:'空', k1:empty, c2:'空', k2:empty, c3:'H2199', k3:filled, c4:'空', k4:empty, c5:'空', k5:empty, c6:'H2170', k6:filled },
+  { layer:'第4层', c1:'空', k1:empty, c2:'空', k2:empty, c3:'空', k3:empty, c4:'空', k4:empty, c5:'空', k5:empty, c6:'空', k6:empty }
+];
+
+const rackColumns = [
+  { name:'layer', label:'层位', width:70 },
+  ...[1,2,3,4,5,6].map(n => ({
+    name:'c'+n, label:n+' 列',
+    type:'tpl',
+    tpl:'<span style="display:inline-block;min-width:64px;padding:4px 8px;border-radius:4px;color:#fff;font-size:12px;background:${k'+n+'}">${c'+n+'}</span>'
+  }))
+];
+
+const opLog = [
+  { time:'13:32:05', user:'zqw',  action:'下料', machine:'M01 Roders', part:'H2165-壳体', result:'完成', resultColor:'#3b6d11' },
+  { time:'13:20:41', user:'李操作工', action:'上料', machine:'M01 Roders', part:'H2165-壳体', result:'完成', resultColor:'#3b6d11' },
+  { time:'12:58:12', user:'李操作工', action:'换件', machine:'M03 Siemens', part:'H2186-电极', result:'失败-机器人超时', resultColor:'#a32d2d' },
+  { time:'12:41:33', user:'zqw',  action:'下料', machine:'M02 Makino', part:'H2159-模芯', result:'完成', resultColor:'#3b6d11' },
+  { time:'11:15:07', user:'王班长', action:'换刀', machine:'M02 Makino', part:'-', result:'完成', resultColor:'#3b6d11' }
+];
+
+const confirmDialog = (title, desc, level) => ({
+  type:'dialog',
+  title: title,
+  body: [
+    { type:'tpl', tpl:'<div style="font-size:14px;line-height:2">' + desc + '</div>' },
+    { type:'divider' },
+    { type:'input-text', name:'operator', label:'工号', placeholder:'输入工号留痕', required:true }
+  ],
+  actions: [
+    { type:'button', label:'取消', actionType:'close' },
+    {
+      type:'button', label:'确认下发', level: level,
+      onEvent: {
+        click: {
+          actions: [
+            { actionType:'toast', args:{ msgType:'success', msg:'指令已下发（演示环境，未接后端）' } },
+            { actionType:'closeDialog' }
+          ]
+        }
+      }
+    }
+  ]
+});
+
+const codeSample =
+'{\n' +
+'  "type": "button",          // 拖上去一个按钮\n' +
+'  "label": "下料",\n' +
+'  "level": "danger",\n' +
+'  "actionType": "dialog",\n' +
+'  "dialog": {\n' +
+'    "title": "确认下料",\n' +
+'    "body": [ ... 弹窗内容 ... ],\n' +
+'    "actions": [\n' +
+'      { "label": "确认下发",\n' +
+'        "onEvent": { "click": { "actions": [\n' +
+'          // 真实环境换成这一行：\n' +
+'          // { "actionType": "ajax",\n' +
+'          //   "api": "post:http://192.168.125.x:8888/api/unload_machine" }\n' +
+'          { "actionType": "toast", "args": { "msg": "已下发" } },\n' +
+'          { "actionType": "closeDialog" }\n' +
+'        ] } } }\n' +
+'      ]\n' +
+'  }\n' +
+'}';
+
+const schema = {
+  type:'page',
+  title:'CNC 产线操作台 · amis 低代码演示',
+  subTitle:'全部界面由一份 JSON 配置生成 · 本地 SDK 离线运行',
+  aside: {
+    type:'panel', title:'这是什么',
+    body: [
+      { type:'tpl', tpl:'<div style="font-size:13px;line-height:2">这就是"拖拽生成"的产物：amis 里拖一个表格、拖一个按钮、绑一个接口，产出的就是这份 JSON。<br><b>演示环境是写死的假数据</b>；接入你的 MachineMonitor 时，只需把数据源换成 <code>http://工控机IP:8888/api/...</code>，界面一行不用改。</div>' }
+    ]
+  },
+  body: [
+    {
+      type:'tabs', mode:'line', tabs: [
+        {
+          title:'机床总览',
+          body: {
+            type:'crud', source:'${machines}', perPage:10,
+            columns: [
+              { name:'id', label:'机床' },
+              { name:'brand', label:'品牌' },
+              { name:'ip', label:'IP' },
+              { name:'statusLabel', label:'状态', type:'tpl',
+                tpl:'<span style="font-weight:500;color:${color}">● ${statusLabel}</span>' },
+              { name:'program', label:'当前程序' },
+              { name:'part', label:'当前工件' },
+              {
+                type:'operation', label:'操作', width:220,
+                buttons: [
+                  { type:'button', label:'下料', level:'danger', size:'sm',
+                    actionType:'dialog',
+                    dialog: confirmDialog('确认下料','对 <b>${id} ${brand}</b> 执行下料流程：机器人取件 → 放回料架 → 机床状态更新。','danger') },
+                  { type:'button', label:'换件', level:'primary', size:'sm',
+                    actionType:'dialog',
+                    dialog: confirmDialog('确认换件','对 <b>${id} ${brand}</b> 执行换件流程：下料 → 装夹新工件 → 启动程序。','primary') },
+                  { type:'button', label:'详情', level:'link', size:'sm',
+                    actionType:'dialog',
+                    dialog: {
+                      title:'${id} ${brand} 详情',
+                      body: [
+                        { type:'static', name:'ip', label:'IP 地址' },
+                        { type:'static', name:'program', label:'当前程序' },
+                        { type:'static', name:'part', label:'当前工件' }
+                      ]
+                    } }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          title:'料架状态',
+          body: [
+            {
+              type:'panel', title:'料架 4 层 × 6 列（琥珀色=有料）',
+              body: {
+                type:'table', source:'${rackRows}', columns: rackColumns
+              }
+            },
+            { type:'tpl', tpl:'<div style="color:#6b6a64;font-size:12px">真实接入后，此表数据来自 GET /api/rack/status，操作工点击任一料位即可触发上料/下料。</div>' }
+          ]
+        },
+        {
+          title:'操作日志',
+          body: {
+            type:'crud', source:'${opLog}', perPage:10,
+            columns: [
+              { name:'time', label:'时间' },
+              { name:'user', label:'工号' },
+              { name:'action', label:'动作' },
+              { name:'machine', label:'机床' },
+              { name:'part', label:'工件' },
+              { name:'result', label:'结果', type:'tpl',
+                tpl:'<span style="font-weight:500;color:${resultColor}">${result}</span>' }
+            ]
+          }
+        },
+        {
+          title:'JSON 长什么样',
+          body: [
+            { type:'tpl', tpl:'<div style="font-size:13px;line-height:2;margin-bottom:8px">可视化编辑器里"拖一个按钮"背后的产物就是这一段。看懂了它，你就拥有全部控制权——能拖，也能直接改。</div>' },
+            { type:'tpl', tpl:'<pre style="background:#2c2c2a;color:#d3d1c7;padding:14px;border-radius:8px;font-size:12px;line-height:1.8;overflow-x:auto">' + codeSample.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>' },
+            { type:'tpl', tpl:'<div style="color:#6b6a64;font-size:12px">接真实后端时，把 toast 换成 ajax 一行，按钮立刻从"演示"变成"真控设备"。</div>' }
+          ]
+        }
+      ]
+    }
+  ],
+  data: {
+    machines: machines,
+    rackRows: rackRows,
+    opLog: opLog
+  }
+};
+
+try {
+  amisRequire('amis/embed').embed('#root', schema, {}, { theme: 'cxd' });
+} catch (e) {
+  document.getElementById('err').style.display = 'block';
+  document.getElementById('err').innerText = 'amis 渲染失败: ' + (e && e.message ? e.message : e);
+}
+
+}
+</script>
+</body>
+</html>

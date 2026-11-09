@@ -1,0 +1,33 @@
+request_id: "2026-11-02-lowcode-report"
+entry_type: "full_pipeline"
+current_stage: "stage3"
+topic: "低代码平台选型与实施建议"
+output_docx_path: "D:\\CodeBuddy CN\\低代码平台\\低代码平台选型与实施建议.docx"
+output_docx_user_specified: true
+stage_1:
+  status: "completed"
+  completed_at: "2026-11-02T14:45:00+08:00"
+  output_path: "stage1/final_draft.md"
+  genre: "work-report"
+  expert_used: "work-report-expert"
+  route_tag: "expert_work_report"
+stage_2:
+  status: "completed"
+  completed_at: "2026-11-02T14:52:00+08:00"
+  route: "html"
+  html_sub: "template"
+  output_path: "stage2/formatted-低代码平台选型与实施建议.html"
+  output_format: "html"
+  skills_invoked: ["design-token", "doc-typeset", "html-review"]
+  html_review_attempts: 1
+stage_3:
+  status: "completed"
+  completed_at: "2026-11-02T14:56:00+08:00"
+  executor: "doc-converter"
+  input_format: "html"
+  output_path: "D:\\CodeBuddy CN\\低代码平台\\低代码平台选型与实施建议.docx"
+  skill_used: ["html-to-doc"]
+  present_files_opened: true
+  fallback: false
+  fallback_used: false
+  fallback_reason: null

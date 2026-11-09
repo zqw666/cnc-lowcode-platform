@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>产线总览看板 · CNC 产线智能应用平台</title>
+<link rel="stylesheet" href="../amis_sdk/sdk.css">
+<link rel="stylesheet" href="../amis_sdk/iconfont.css">
+<style>
+  body{margin:0;background:#0f1b2d;font-family:"Microsoft YaHei",sans-serif;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../amis_sdk/sdk.js"></script>
+<script>
+if (typeof amisRequire === 'undefined') {
+  document.getElementById('root').innerHTML = '<p style="color:#fff;padding:40px">amis SDK 加载失败：请确认 apps 目录与 amis_sdk 目录的相对位置。</p>';
+} else {
+
+/* ============================================================
+ * 接口配置：接真实后端时只改这里（工控机 IP）
+ * 真实接入示例：service 的 initApi 换成
+ *   "get:http://192.168.125.x:8888/api/machines"
+ * 并在 amis 渲染时替换下方 mock 数据（把 data 里的静态数组
+ * 换成接口返回字段即可）。
+ * ============================================================ */
+const API_BASE = 'http://192.168.125.x:8888';  // 占位，待换成工控机实际 IP
+
+const machines = [
+  { id:'M01', brand:'Roders',  status:'run',   statusLabel:'加工中', color:'#00c853', program:'O0011',  part:'H2165-壳体',  since:'08:12', hours:6.5, rate:92 },
+  { id:'M02', brand:'Makino',  status:'idle',  statusLabel:'空闲',   color:'#ffb300', program:'-',      part:'-',           since:'11:40', hours:5.2, rate:78 },
+  { id:'M03', brand:'Siemens', status:'alarm', statusLabel:'报警',   color:'#ff5252', program:'N90_XZ', part:'H2186-电极',  since:'13:05', hours:4.1, rate:61 },
+  { id:'M04', brand:'Fanuc',   status:'off',   statusLabel:'离线',   color:'#78909c', program:'-',      part:'-',           since:'-',     hours:0,   rate:0 }
+];
+
+const rackRows = [
+  { layer:'第1层', c1:'H2165', k1:1, c2:'空', k2:0, c3:'H2159', k3:1, c4:'空', k4:0, c5:'H2188', k5:1, c6:'空', k6:0 },
+  { layer:'第2层', c1:'空', k1:0, c2:'H2186', k2:1, c3:'空', k3:0, c4:'H2201', k4:1, c5:'空', k5:0, c6:'空', k6:0 },
+  { layer:'第3层', c1:'空', k1:0, c2:'空', k2:0, c3:'H2199', k3:1, c4:'空', k4:0, c5:'空', k5:0, c6:'H2170', k6:1 },
+  { layer:'第4层', c1:'空', k1:0, c2:'空', k2:0, c3:'空', k3:0, c4:'空', k4:0, c5:'空', k5:0, c6:'空', k6:0 }
+];
+
+const robot = { id:'ESTUN-01', status:'工作中', color:'#00c853', task:'M03 换件作业', step:'取件移动中', progress:65 };
+
+const alarms = [
+  { time:'13:05', machine:'M03 Siemens', level:'高',   text:'气压异常报警（AL-2043）', ack:'未确认' },
+  { time:'11:40', machine:'M02 Makino',  level:'低',   text:'加工完成等待上料',       ack:'已确认' },
+  { time:'09:22', machine:'M01 Roders',  level:'提示', text:'刀具寿命到达预警（T05）', ack:'已确认' }
+];
+
+const stats = {
+  run:  machines.filter(m=>m.status==='run').length,
+  idle: machines.filter(m=>m.status==='idle').length,
+  alarm:machines.filter(m=>m.status==='alarm').length,
+  off:  machines.filter(m=>m.status==='off').length
+};
+
+const kpiCard = (label, num, color) =>
+  '<div style="flex:1;background:#16263d;border:1px solid #23364f;border-radius:10px;padding:14px 18px">'
+  + '<div style="color:#8aa0bd;font-size:13px">' + label + '</div>'
+  + '<div style="color:' + color + ';font-size:34px;font-weight:bold;line-height:1.2">' + num + '</div>'
+  + '</div>';
+
+const machineCard = (m) =>
+  '<div style="background:#16263d;border:1px solid #23364f;border-left:4px solid ' + m.color + ';border-radius:10px;padding:14px 16px;min-width:230px">'
+  + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+  +   '<span style="color:#e8eef6;font-size:17px;font-weight:bold">' + m.id + ' <span style="color:#8aa0bd;font-size:13px;font-weight:normal">' + m.brand + '</span></span>'
+  +   '<span style="color:' + m.color + ';font-size:13px">● ' + m.statusLabel + '</span>'
+  + '</div>'
+  + '<div style="color:#8aa0bd;font-size:12px;line-height:2">'
+  +   '程序：' + m.program + '<br>工件：' + m.part + '<br>连续运行自 ' + m.since + ' · 今日 ' + m.hours.toFixed(1) + 'h'
+  + '</div>'
+  + '<div style="margin-top:8px;background:#0f1b2d;border-radius:6px;height:14px;overflow:hidden">'
+  +   '<div style="width:' + m.rate + '%;height:100%;background:' + m.color + '"></div>'
+  + '</div>'
+  + '<div style="color:#8aa0bd;font-size:11px;margin-top:4px">稼动率 ' + m.rate + '%</div>'
+  + '</div>';
+
+const rackCell = (c, k) =>
+  '<span style="display:inline-block;min-width:70px;text-align:center;padding:8px 0;border-radius:6px;font-size:12px;'
+  + (k ? 'background:#8d6e1f;color:#ffe082' : 'background:#16263d;color:#41536e') + '">' + c + '</span>';
+
+const rackRow = (r) =>
+  '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'
+  + '<span style="color:#8aa0bd;font-size:12px;width:44px">' + r.layer + '</span>'
+  + rackCell(r.c1,r.k1) + rackCell(r.c2,r.k2) + rackCell(r.c3,r.k3)
+  + rackCell(r.c4,r.k4) + rackCell(r.c5,r.k5) + rackCell(r.c6,r.k6)
+  + '</div>';
+
+const panel = (title, inner) =>
+  '<div style="background:#121f33;border:1px solid #23364f;border-radius:12px;padding:16px">'
+  + '<div style="color:#5f7ba0;font-size:14px;font-weight:bold;letter-spacing:1px;margin-bottom:12px">' + title + '</div>'
+  + inner + '</div>';
+
+const dashboardHtml =
+  '<div style="padding:18px 22px">'
+  + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+  +   '<div><span style="color:#e8eef6;font-size:22px;font-weight:bold">CNC 产线总览看板</span>'
+  +   '<span style="color:#5f7ba0;font-size:12px;margin-left:12px">数据源：MachineMonitor :8888 · 自动刷新 30s</span></div>'
+  +   '<span style="color:#00c853;font-size:12px">● 系统正常</span>'
+  + '</div>'
+  + '<div style="display:flex;gap:12px;margin-bottom:16px">'
+  +   kpiCard('加工中', stats.run, '#00c853') + kpiCard('空闲', stats.idle, '#ffb300')
+  +   kpiCard('报警', stats.alarm, '#ff5252') + kpiCard('离线', stats.off, '#78909c')
+  +   kpiCard('料架占用', rackRows.reduce((s,r)=>s+r.k1+r.k2+r.k3+r.k4+r.k5+r.k6,0) + ' / 24', '#4fc3f7')
+  + '</div>'
+  + '<div style="display:flex;gap:12px;margin-bottom:16px">'
+  +   machines.map(machineCard).join('')
+  + '</div>'
+  + '<div style="display:flex;gap:12px">'
+  +   panel('料架占用（4 层 × 6 列 · 黄色=有料）', rackRows.map(rackRow).join(''))
+  +   panel('机器人 · ' + robot.id,
+        '<div style="color:#e8eef6;font-size:15px;margin-bottom:6px">状态：' + robot.status + '</div>'
+      + '<div style="color:#8aa0bd;font-size:12px;line-height:2">当前任务：' + robot.task + '<br>执行步骤：' + robot.step + '</div>'
+      + '<div style="margin-top:10px;background:#0f1b2d;border-radius:6px;height:14px;overflow:hidden">'
+      + '<div style="width:' + robot.progress + '%;height:100%;background:#00c853"></div></div>'
+      + '<div style="color:#8aa0bd;font-size:11px;margin-top:4px">任务进度 ' + robot.progress + '%</div>')
+  + '</div>'
+  + '<div style="margin-top:12px">'
+  +   panel('异常与报警',
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        + '<tr style="color:#5f7ba0;text-align:left"><td style="padding:6px 8px">时间</td><td>机床</td><td>级别</td><td>内容</td><td>确认</td></tr>'
+        + alarms.map(a =>
+            '<tr style="border-top:1px solid #23364f">'
+            + '<td style="padding:8px;color:#8aa0bd">' + a.time + '</td>'
+            + '<td style="color:#e8eef6">' + a.machine + '</td>'
+            + '<td><span style="color:' + (a.level==='高'?'#ff5252':a.level==='低'?'#ffb300':'#4fc3f7') + '">' + a.level + '</span></td>'
+            + '<td style="color:#e8eef6">' + a.text + '</td>'
+            + '<td style="color:' + (a.ack==='未确认'?'#ff5252':'#5f7ba0') + '">' + a.ack + '</td>'
+            + '</tr>').join('')
+        + '</table>')
+  + '</div>'
+  + '</div>';
+
+const schema = {
+  type: 'page',
+  data: { apiBase: API_BASE },
+  body: [
+    { type: 'tpl', tpl: dashboardHtml, style: { background: '#0f1b2d', minHeight: '100vh' } }
+  ]
+};
+
+amisRequire('amis/embed').embed('#root', schema, {}, { theme: 'dark' });
+
+}
+</script>
+</body>
+</html>
