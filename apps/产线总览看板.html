@@ -21,11 +21,11 @@ if (typeof amisRequire === 'undefined') {
 /* ============================================================
  * 接口配置：接真实后端时只改这里（工控机 IP）
  * 真实接入示例：service 的 initApi 换成
- *   "get:http://192.168.125.x:8888/api/machines"
+ *   "get:http://localhost:8888/api/machines"
  * 并在 amis 渲染时替换下方 mock 数据（把 data 里的静态数组
  * 换成接口返回字段即可）。
  * ============================================================ */
-const API_BASE = 'http://192.168.125.x:8888';  // 占位，待换成工控机实际 IP
+const API_BASE = 'http://localhost:8888';  // 占位，待换成工控机实际 IP
 
 const machines = [
   { id:'M01', brand:'Roders',  status:'run',   statusLabel:'加工中', color:'#00c853', program:'O0011',  part:'H2165-壳体',  since:'08:12', hours:6.5, rate:92 },

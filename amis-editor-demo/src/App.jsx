@@ -9,7 +9,7 @@ const starter = {
     {
       type: 'crud',
       name: 'machines',
-      api: 'http://192.168.125.x:8888/api/machines',
+      api: 'http://localhost:8888/api/machines',
       columns: [
         { name: 'id', label: '机床' },
         { name: 'brand', label: '品牌' },
@@ -21,7 +21,7 @@ const starter = {
       label: '下料',
       level: 'danger',
       actionType: 'ajax',
-      api: { method: 'post', url: 'http://192.168.125.x:8888/api/unload_machine' },
+      api: { method: 'post', url: 'http://localhost:8888/api/unload_machine' },
       confirmText: '确认对本机床执行下料？'
     }
   ]
